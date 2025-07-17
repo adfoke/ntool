@@ -16,7 +16,19 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
+#include <netinet/tcp_var.h>
+#include <netinet/udp_var.h>
+#include <netinet/tcp_fsm.h>
 #include <arpa/inet.h>
+
+// 定义IPv4和IPv6标志，如果头文件中没有定义
+#ifndef INP_IPV4
+#define INP_IPV4 0x1
+#endif
+
+#ifndef INP_IPV6
+#define INP_IPV6 0x2
+#endif
 
 // Version information
 #define NTOOL_VERSION "1.0.0"

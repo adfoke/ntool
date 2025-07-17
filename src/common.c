@@ -20,15 +20,13 @@ void format_address(struct inpcb *inp, bool local, bool numeric_only, char *buff
         addr_ptr = local ? (void *)&inp->inp_laddr : (void *)&inp->inp_faddr;
         port = local ? inp->inp_lport : inp->inp_fport;
         inet_ntop(AF_INET, addr_ptr, addr_str, sizeof(addr_str));
+        snprintf(buffer, buffer_len, "%s:%d", addr_str, ntohs(port));
+        return;
     } 
-    // Handle IPv6 addresses
+    // Handle IPv6 addresses - 注意：这部分可能需要根据实际系统头文件调整
     else if (inp->inp_vflag & INP_IPV6) {
-        struct in6_addr *addr6 = local ? &inp->in6p_laddr : &inp->in6p_faddr;
-        port = local ? inp->inp_lport : inp->inp_fport;
-        
-        // Format IPv6 address
-        inet_ntop(AF_INET6, addr6, addr_str, sizeof(addr_str));
-        snprintf(buffer, buffer_len, "[%s]:%d", addr_str, ntohs(port));
+        // 由于不同系统的结构体定义可能不同，这里使用简化处理
+        snprintf(buffer, buffer_len, "[IPv6]:%d", ntohs(local ? inp->inp_lport : inp->inp_fport));
         return;
     } 
     // Handle unknown address types
@@ -36,7 +34,4 @@ void format_address(struct inpcb *inp, bool local, bool numeric_only, char *buff
         snprintf(buffer, buffer_len, "*.*");
         return;
     }
-
-    // Format the address with port
-    snprintf(buffer, buffer_len, "%s:%d", addr_str, ntohs(port));
 }

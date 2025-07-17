@@ -6,6 +6,9 @@
 #include <netinet/tcp_var.h>
 #include <netinet/tcp_fsm.h>
 
+// 确保TCP状态数组在头文件中声明
+extern const char *tcp_states[];
+
 // Function to print TCP connections
 int print_tcp_connections(const ntool_config_t *config);
 
