@@ -1,13 +1,50 @@
 #include "../../include/udp.h"
+#include <libproc.h>
 
+/**
+ * @brief 获取UDP连接的进程信息
+ * 
+ * 尝试获取与UDP连接关联的进程ID和进程名
+ * 
+ * @param xip 指向xinpcb结构体的指针，包含UDP连接信息
+ * @param proc_info 输出缓冲区，用于存储进程信息
+ * @param proc_info_len 缓冲区长度
+ * @return 成功返回0，失败返回错误代码
+ */
 int get_udp_process_info(struct xinpcb *xip, char *proc_info, size_t proc_info_len) {
-    // This is platform-specific and would require additional system calls
-    // For macOS, we might use libproc or other APIs
-    // For simplicity, we'll just indicate it's not implemented yet
+    // 在macOS上，获取进程信息需要额外的API调用
+    // 这里我们简化实现，只显示一个占位符
+    // 实际实现可能需要使用libproc库的proc_pidinfo等函数
+    
     snprintf(proc_info, proc_info_len, "-");
+    
+    // 注意：完整实现可能类似于以下代码（需要适当修改）：
+    /*
+    int pid = ... // 从连接中获取PID
+    if (pid > 0) {
+        char path[PROC_PIDPATHINFO_MAXSIZE];
+        if (proc_pidpath(pid, path, sizeof(path)) > 0) {
+            char *name = strrchr(path, '/');
+            if (name) name++;
+            else name = path;
+            snprintf(proc_info, proc_info_len, "%d/%s", pid, name);
+            return 0;
+        }
+    }
+    */
+    
     return 0;
 }
 
+/**
+ * @brief 检查UDP连接是否匹配过滤条件
+ * 
+ * 根据配置中的过滤条件（地址或端口）检查UDP连接是否匹配
+ * 
+ * @param xip 指向xinpcb结构体的指针，包含UDP连接信息
+ * @param config 配置结构体，包含过滤条件
+ * @return 如果连接匹配过滤条件返回true，否则返回false
+ */
 bool udp_connection_matches_filter(struct xinpcb *xip, const ntool_config_t *config) {
     struct inpcb *inp = &xip->xi_inp;
     
@@ -50,6 +87,15 @@ bool udp_connection_matches_filter(struct xinpcb *xip, const ntool_config_t *con
     return true;
 }
 
+/**
+ * @brief 打印UDP连接信息
+ * 
+ * 获取并显示系统中的UDP连接信息，包括本地地址、远程地址和可选的进程信息。
+ * 支持按地址或端口过滤连接。
+ * 
+ * @param config 配置结构体，包含显示选项和过滤条件
+ * @return 成功返回NTOOL_ERROR_NONE，失败返回相应的错误代码
+ */
 int print_udp_connections(const ntool_config_t *config) {
     char *buf = NULL;
     size_t len = 0;
@@ -65,8 +111,16 @@ int print_udp_connections(const ntool_config_t *config) {
 
     // Get the size of the buffer needed
     if (sysctl(name, 4, NULL, &len, NULL, 0) < 0) {
-        ntool_error("sysctl (get size) UDP failed", NTOOL_ERROR_SYSCTL);
-        return NTOOL_ERROR_SYSCTL;
+        if (errno == EACCES || errno == EPERM) {
+            ntool_error("sysctl (get size) UDP failed", NTOOL_ERROR_PERMISSION);
+            return NTOOL_ERROR_PERMISSION;
+        } else if (errno == ENOMEM) {
+            ntool_error("sysctl (get size) UDP failed", NTOOL_ERROR_MEMORY);
+            return NTOOL_ERROR_MEMORY;
+        } else {
+            ntool_error("sysctl (get size) UDP failed", NTOOL_ERROR_SYSCTL);
+            return NTOOL_ERROR_SYSCTL;
+        }
     }
 
     // Allocate the buffer
@@ -78,9 +132,19 @@ int print_udp_connections(const ntool_config_t *config) {
 
     // Get the actual connection data
     if (sysctl(name, 4, buf, &len, NULL, 0) < 0) {
-        ntool_error("sysctl (get data) UDP failed", NTOOL_ERROR_SYSCTL);
-        free(buf);
-        return NTOOL_ERROR_SYSCTL;
+        if (errno == EACCES || errno == EPERM) {
+            ntool_error("sysctl (get data) UDP failed", NTOOL_ERROR_PERMISSION);
+            free(buf);
+            return NTOOL_ERROR_PERMISSION;
+        } else if (errno == ENOMEM) {
+            ntool_error("sysctl (get data) UDP failed", NTOOL_ERROR_MEMORY);
+            free(buf);
+            return NTOOL_ERROR_MEMORY;
+        } else {
+            ntool_error("sysctl (get data) UDP failed", NTOOL_ERROR_SYSCTL);
+            free(buf);
+            return NTOOL_ERROR_SYSCTL;
+        }
     }
 
     // Iterate through the connection structures

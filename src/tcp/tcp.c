@@ -1,20 +1,61 @@
 #include "../../include/tcp.h"
+#include <libproc.h>
 
-// TCP states array (consistent with tcp_fsm.h)
+/**
+ * @brief TCP状态数组
+ * 
+ * 与tcp_fsm.h中的状态定义一致，用于将数字状态转换为可读字符串
+ */
 const char *tcp_states[] = {
     "CLOSED",       "LISTEN",       "SYN_SENT",     "SYN_RECEIVED",
     "ESTABLISHED",  "CLOSE_WAIT",   "FIN_WAIT_1",   "CLOSING",
     "LAST_ACK",     "FIN_WAIT_2",   "TIME_WAIT",
 };
 
+/**
+ * @brief 获取TCP连接的进程信息
+ * 
+ * 尝试获取与TCP连接关联的进程ID和进程名
+ * 
+ * @param xtp 指向xtcpcb结构体的指针，包含TCP连接信息
+ * @param proc_info 输出缓冲区，用于存储进程信息
+ * @param proc_info_len 缓冲区长度
+ * @return 成功返回0，失败返回错误代码
+ */
 int get_tcp_process_info(struct xtcpcb *xtp, char *proc_info, size_t proc_info_len) {
-    // This is platform-specific and would require additional system calls
-    // For macOS, we might use libproc or other APIs
-    // For simplicity, we'll just indicate it's not implemented yet
+    // 在macOS上，获取进程信息需要额外的API调用
+    // 这里我们简化实现，只显示一个占位符
+    // 实际实现可能需要使用libproc库的proc_pidinfo等函数
+    
     snprintf(proc_info, proc_info_len, "-");
+    
+    // 注意：完整实现可能类似于以下代码（需要适当修改）：
+    /*
+    int pid = ... // 从连接中获取PID
+    if (pid > 0) {
+        char path[PROC_PIDPATHINFO_MAXSIZE];
+        if (proc_pidpath(pid, path, sizeof(path)) > 0) {
+            char *name = strrchr(path, '/');
+            if (name) name++;
+            else name = path;
+            snprintf(proc_info, proc_info_len, "%d/%s", pid, name);
+            return 0;
+        }
+    }
+    */
+    
     return 0;
 }
 
+/**
+ * @brief 检查TCP连接是否匹配过滤条件
+ * 
+ * 根据配置中的过滤条件（地址或端口）检查TCP连接是否匹配
+ * 
+ * @param xtp 指向xtcpcb结构体的指针，包含TCP连接信息
+ * @param config 配置结构体，包含过滤条件
+ * @return 如果连接匹配过滤条件返回true，否则返回false
+ */
 bool tcp_connection_matches_filter(struct xtcpcb *xtp, const ntool_config_t *config) {
     struct inpcb *inp = &xtp->xt_inp;
     
@@ -50,6 +91,15 @@ bool tcp_connection_matches_filter(struct xtcpcb *xtp, const ntool_config_t *con
     return true;
 }
 
+/**
+ * @brief 打印TCP连接信息
+ * 
+ * 获取并显示系统中的TCP连接信息，包括本地地址、远程地址、连接状态和可选的进程信息。
+ * 支持按地址或端口过滤连接。
+ * 
+ * @param config 配置结构体，包含显示选项和过滤条件
+ * @return 成功返回NTOOL_ERROR_NONE，失败返回相应的错误代码
+ */
 int print_tcp_connections(const ntool_config_t *config) {
     char *buf = NULL;
     size_t len = 0;
@@ -65,8 +115,16 @@ int print_tcp_connections(const ntool_config_t *config) {
 
     // Get the size of the buffer needed
     if (sysctl(name, 4, NULL, &len, NULL, 0) < 0) {
-        ntool_error("sysctl (get size) TCP failed", NTOOL_ERROR_SYSCTL);
-        return NTOOL_ERROR_SYSCTL;
+        if (errno == EACCES || errno == EPERM) {
+            ntool_error("sysctl (get size) TCP failed", NTOOL_ERROR_PERMISSION);
+            return NTOOL_ERROR_PERMISSION;
+        } else if (errno == ENOMEM) {
+            ntool_error("sysctl (get size) TCP failed", NTOOL_ERROR_MEMORY);
+            return NTOOL_ERROR_MEMORY;
+        } else {
+            ntool_error("sysctl (get size) TCP failed", NTOOL_ERROR_SYSCTL);
+            return NTOOL_ERROR_SYSCTL;
+        }
     }
 
     // Allocate the buffer
@@ -78,9 +136,19 @@ int print_tcp_connections(const ntool_config_t *config) {
 
     // Get the actual connection data
     if (sysctl(name, 4, buf, &len, NULL, 0) < 0) {
-        ntool_error("sysctl (get data) TCP failed", NTOOL_ERROR_SYSCTL);
-        free(buf);
-        return NTOOL_ERROR_SYSCTL;
+        if (errno == EACCES || errno == EPERM) {
+            ntool_error("sysctl (get data) TCP failed", NTOOL_ERROR_PERMISSION);
+            free(buf);
+            return NTOOL_ERROR_PERMISSION;
+        } else if (errno == ENOMEM) {
+            ntool_error("sysctl (get data) TCP failed", NTOOL_ERROR_MEMORY);
+            free(buf);
+            return NTOOL_ERROR_MEMORY;
+        } else {
+            ntool_error("sysctl (get data) TCP failed", NTOOL_ERROR_SYSCTL);
+            free(buf);
+            return NTOOL_ERROR_SYSCTL;
+        }
     }
 
     // Iterate through the connection structures
