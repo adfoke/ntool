@@ -1,5 +1,14 @@
 {
     "files.associations": {
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "ip6.h": "c",
+        "sysctl.h": "c",
+        "udp.h": "c",
+        "tcp_var.h": "c",
+        "inet.h": "c",
+        "types.h": "c",
+        "udp_var.h": "c",
+        "tcp_fsm.h": "c",
+        "socket.h": "c"
     }
 }
